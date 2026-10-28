@@ -776,11 +776,18 @@ function endDomainSukuna() {
 }
 
 /* ═════════════ 업데이트 ═════════════ */
+/* 치트 (개발·재미용): G 무적 · F 주력 무한 · O 원킬 · K 전멸 · N 웨이브 스킵 */
+const CHEAT = { god: false, ce: false, one: false };
+function cheatToast(name, on) { toast("치트 · " + name + (on ? " ON" : " OFF") + " (이번 판 최고점수 기록 안 됨)", 1600); }
+function cheatKillAll() { while (G.enemies.length) killEnemy(G.enemies[0], "domain"); G.bolts.length = 0; G.waves.length = 0; }
+function cheatSkipWave() { G.queue.length = 0; cheatKillAll(); G.nextWaveT = .3; }
+
 function update(dt, rdt, now) {
   updateHands(rdt, now);
   if (G.phase !== "play" && G.phase !== "dojo") return;
   if (G.paused) return;
   const dojo = G.phase === "dojo";
+  if (G.phase === "play" && (CHEAT.god || CHEAT.ce || CHEAT.one)) G.cheated = true;
   G.t += dt;
   G.shake = Math.max(0, G.shake - rdt * 36); G.flash = Math.max(0, G.flash - rdt * 2.2); G.hurt = Math.max(0, G.hurt - rdt * 2);
   G.comboT -= dt; if (G.comboT <= 0) G.combo = 0;
@@ -1025,11 +1032,13 @@ function update(dt, rdt, now) {
     if (w.r > w.max + Rinf * 2.5) G.waves.splice(i, 1);
   }
 
+  if (CHEAT.one) for (const e of G.enemies) if (e.hit > 0) e.hp = 0;
   for (const e of [...G.enemies]) if (e.hp <= 0) killEnemy(e, D ? "domain" : "tech");
 
   /* 주력 */
   if (!D) G.ce += (dojo ? 22 : G.burnout > 0 ? 3 : CHAR === "sukuna" ? 9 : 7) * dt;
   G.ce = clamp(G.ce, 0, 100);
+  if (CHEAT.ce) { G.ce = 100; G.burnout = 0; G.purpleCD = 0; }
   if (CHAR === "gojo" && !D && G.infOn && G.ce <= 0) { G.infOn = false; toast("무하한이 무너졌어요! 주력을 회복하세요", 2200); AU.warn(); G.hurt = .6; }
   else if (CHAR === "gojo" && !G.infOn && (G.ce >= 10 || D)) { G.infOn = true; toast("무하한 재전개"); }
 
@@ -1070,6 +1079,7 @@ function update(dt, rdt, now) {
 
   AU.humSet(blueMax);
   if (dojo) checkDojo();
+  if (CHEAT.god) G.hp = 100;
   if (!dojo && G.hp <= 0) gameOver();
 }
 
@@ -1088,7 +1098,7 @@ function checkDojo() {
 
 function gameOver() {
   G.phase = "over"; AU.humSet(0);
-  const nb = G.score > BEST;
+  const nb = G.score > BEST && !G.cheated;
   if (nb) { BEST = G.score; store.set(CHAR === "gojo" ? "jjk-best" : "jjk-best-sukuna", BEST); }
   $("overScore").textContent = G.score.toLocaleString();
   $("newBest").classList.toggle("hide", !nb);
@@ -1695,6 +1705,13 @@ addEventListener("keydown", (e) => {
   KEYS.add(k);
   if (k === "3" && CHAR === "gojo" && (G.phase === "play" || G.phase === "dojo")) G.forcePurple = true;
   if (k === "c" && (G.phase === "play" || G.phase === "dojo")) G.ce = 100;
+  if (G.phase === "play" || G.phase === "dojo") {
+    if (k === "g") { CHEAT.god = !CHEAT.god; cheatToast("무적", CHEAT.god); }
+    if (k === "f") { CHEAT.ce = !CHEAT.ce; cheatToast("주력 무한", CHEAT.ce); }
+    if (k === "o") { CHEAT.one = !CHEAT.one; cheatToast("원킬", CHEAT.one); }
+    if (k === "k") { if (G.phase === "play") G.cheated = true; cheatKillAll(); }
+    if (k === "n" && G.phase === "play") { G.cheated = true; cheatSkipWave(); }
+  }
   if (k === "h") $("helpBtn").click();
   if (k === "d") DEBUG = !DEBUG;
 });
